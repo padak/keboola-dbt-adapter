@@ -1,31 +1,31 @@
-# dbt Adapter pro Keboola Query Service - Implementation Plan
+# dbt Adapter for Keboola Query Service - Implementation Plan
 
-## Cil
-Vytvorit plnohodnotny dbt adapter, ktery umozni spoustet dbt modely pres Keboola Query Service REST API misto primeho pripojeni k Snowflake.
+## Goal
+Create a full-featured dbt adapter that enables running dbt models through Keboola Query Service REST API instead of direct Snowflake connection.
 
-## Status: FUNKCNI ZAKLAD
+## Status: FUNCTIONAL BASE
 
-Adapter funguje pro zakladni use case:
+The adapter works for basic use cases:
 - `dbt debug` - OK
-- `dbt run` s table materializaci - OK
-- Idempotentni operace - OK
-- Cteni z read-only schemat - OK
+- `dbt run` with table materialization - OK
+- Idempotent operations - OK
+- Reading from read-only schemas - OK
 
-## Klicove informace
-- **Backend:** Snowflake (SQL dialekt)
+## Key Information
+- **Backend:** Snowflake (SQL dialect)
 - **SDK:** `keboola-query-service` Python package
 - **Test data:** `out.c-amplitude.events`
-- **Branch ID:** Ciselne ID (ne "default")
+- **Branch ID:** Numeric ID (not "default")
 
-## Struktura projektu
+## Project Structure
 
 ```
 dbt-keboola/
 ├── pyproject.toml                    # Python packaging
 ├── requirements.txt
-├── CLAUDE.md                         # Dokumentace
-├── PLAN.md                           # Tento soubor
-├── test_query_service.py             # Test script pro SDK
+├── CLAUDE.md                         # Documentation
+├── PLAN.md                           # This file
+├── test_query_service.py             # Test script for SDK
 │
 ├── dbt/
 │   ├── __init__.py                   # Namespace package
@@ -51,79 +51,79 @@ dbt-keboola/
 │
 ├── tests/                            # TODO
 │
-└── sample_project/                   # Testovaci dbt projekt
-    ├── dbt_project.yml               # S dispatch konfiguraci
+└── sample_project/                   # Test dbt project
+    ├── dbt_project.yml               # With dispatch configuration
     ├── profiles.yml
     └── models/
-        └── test_simple.sql           # Funkcni test model
+        └── test_simple.sql           # Functional test model
 ```
 
-## Implementacni kroky
+## Implementation Steps
 
-### 1. Zakladni struktura projektu
-- [x] Vytvorit adresarovou strukturu
-- [x] Nastavit pyproject.toml s dependencies
-- [x] Vytvorit requirements.txt
-- [x] Namespace package __init__.py soubory
+### 1. Basic Project Structure
+- [x] Create directory structure
+- [x] Set up pyproject.toml with dependencies
+- [x] Create requirements.txt
+- [x] Namespace package __init__.py files
 
-### 2. Core tridy (connections.py)
+### 2. Core Classes (connections.py)
 - [x] `KeboolaCredentials` - token, workspace_id, branch_id, host
-- [x] `KeboolaConnectionManager` - sprava API klienta
-- [x] `KeboolaConnectionHandle` - wrapper pro SDK Client s transaction metodami
-- [x] `KeboolaCursor` - DB-API 2.0 emulace nad REST API
+- [x] `KeboolaConnectionManager` - API client management
+- [x] `KeboolaConnectionHandle` - wrapper for SDK Client with transaction methods
+- [x] `KeboolaCursor` - DB-API 2.0 emulation over REST API
 
-### 3. Adapter implementace (impl.py)
-- [x] `KeboolaAdapter(SQLAdapter)` - hlavni adapter trida
-- [x] `list_relations_without_caching()` - seznam tabulek
-- [x] `get_columns_in_relation()` - schema tabulky
+### 3. Adapter Implementation (impl.py)
+- [x] `KeboolaAdapter(SQLAdapter)` - main adapter class
+- [x] `list_relations_without_caching()` - list tables
+- [x] `get_columns_in_relation()` - table schema
 - [x] `drop_relation()`, `truncate_relation()`, `rename_relation()`
 - [x] `create_schema()`, `drop_schema()`
 
-### 4. Pomocne tridy
+### 4. Helper Classes
 - [x] `KeboolaRelation` (relation.py) - Snowflake naming, case-insensitive matching
 - [x] `KeboolaColumn` (column.py) - Snowflake type mappings
 
-### 5. Macro implementace
+### 5. Macro Implementation
 - [x] `keboola__create_table_as` - CREATE OR REPLACE TABLE
 - [x] `keboola__create_view_as` - CREATE OR REPLACE VIEW
-- [x] `keboola__get_create_table_as_sql` - dispatched verze
-- [x] Table materialization (zakladni)
+- [x] `keboola__get_create_table_as_sql` - dispatched version
+- [x] Table materialization (basic)
 - [x] Catalog/information_schema queries (uppercase columns)
-- [ ] View materialization (potrebuje test)
+- [ ] View materialization (needs testing)
 - [ ] Incremental materialization (merge, delete+insert, append)
 - [ ] Seeds loading
 - [ ] Snapshot materialization
 
-### 6. Plugin registrace
-- [x] `__init__.py` s AdapterPlugin
-- [x] Entry point v pyproject.toml
+### 6. Plugin Registration
+- [x] `__init__.py` with AdapterPlugin
+- [x] Entry point in pyproject.toml
 
-### 7. Testovaci dbt projekt
-- [x] profiles.yml s keboola credentials
-- [x] dbt_project.yml s dispatch konfiguraci
-- [x] Test model `test_simple.sql` nad amplitude events
-- [ ] Dalsi testovaci modely
+### 7. Test dbt Project
+- [x] profiles.yml with keboola credentials
+- [x] dbt_project.yml with dispatch configuration
+- [x] Test model `test_simple.sql` using amplitude events
+- [ ] Additional test models
 
-### 8. Testy
-- [ ] Unit testy pro credentials a cursor
-- [ ] Funkcni testy s realnym API
+### 8. Tests
+- [ ] Unit tests for credentials and cursor
+- [ ] Functional tests with real API
 
-## Klicove opravy behem vyvoje
+## Key Fixes During Development
 
-| Problem | Reseni |
-|---------|--------|
-| 403 workspace error | Pouzit ID z `/v2/storage/workspaces` API, ne ze SNOWFLAKE_USER |
-| Case sensitivity | Implementovat `_is_exactish_match()` a `matches()` v KeboolaRelation |
-| Makra se nepouzivaji | Pridat `dispatch` sekci do dbt_project.yml |
-| INFORMATION_SCHEMA columns | Pouzit UPPERCASE bez uvozovek |
-| Transaction errors | Pridat `begin()`, `commit()`, `rollback()` metody |
+| Problem | Solution |
+|---------|----------|
+| 403 workspace error | Use ID from `/v2/storage/workspaces` API, not from SNOWFLAKE_USER |
+| Case sensitivity | Implement `_is_exactish_match()` and `matches()` in KeboolaRelation |
+| Macros not being used | Add `dispatch` section to dbt_project.yml |
+| INFORMATION_SCHEMA columns | Use UPPERCASE without quotes |
+| Transaction errors | Add `begin()`, `commit()`, `rollback()` methods |
 
-## Konfigurace
+## Configuration
 
 ### .env
 ```
 KEBOOLA_API_TOKEN=xxx
-KEBOOLA_WORKSPACE_ID=2950196630    # Z /v2/storage/workspaces
+KEBOOLA_WORKSPACE_ID=2950196630    # From /v2/storage/workspaces
 KEBOOLA_BRANCH_ID=1261313
 KEBOOLA_SNOWFLAKE_DB=SAPI_10504
 KEBOOLA_SNOWFLAKE_SCHEMA=WORKSPACE_1282429287
@@ -153,25 +153,25 @@ dispatch:
     search_order: ['keboola_sample', 'keboola', 'dbt']
 ```
 
-## Spusteni
+## Running
 
 ```bash
-# Aktivovat prostredi
+# Activate environment
 source .venv/bin/activate
 set -a && source .env && set +a
 
-# Test pripojeni
+# Test connection
 dbt debug --project-dir sample_project --profiles-dir sample_project
 
-# Spustit model
+# Run model
 dbt run --project-dir sample_project --profiles-dir sample_project --select test_simple
 ```
 
-## Dalsi kroky (TODO)
+## Next Steps (TODO)
 
-1. **View materializace** - otestovat a pripadne opravit
-2. **Incremental materializace** - implementovat merge strategii
-3. **Unit testy** - pytest pro connections, cursor, relation
-4. **Functional testy** - testy s realnym Keboola API
-5. **CI/CD** - GitHub Actions pro automaticke testovani
-6. **Dokumentace** - README.md pro publikaci na PyPI
+1. **View materialization** - test and fix if needed
+2. **Incremental materialization** - implement merge strategy
+3. **Unit tests** - pytest for connections, cursor, relation
+4. **Functional tests** - tests with real Keboola API
+5. **CI/CD** - GitHub Actions for automated testing
+6. **Documentation** - README.md for PyPI publication

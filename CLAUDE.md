@@ -1,70 +1,70 @@
 # dbt-keboola Adapter
 
-dbt adapter pro Keboola Query Service - umoznuje spoustet dbt modely pres Keboola REST API misto primeho pripojeni k Snowflake.
+dbt adapter for Keboola Query Service - enables running dbt models through Keboola REST API instead of direct Snowflake connection.
 
 ## Quick Start
 
 ```bash
-# Aktivovat prostredi
+# Activate environment
 source .venv/bin/activate
 set -a && source .env && set +a
 
-# Test pripojeni
+# Test connection
 dbt debug --project-dir sample_project --profiles-dir sample_project
 
-# Spustit model
+# Run model
 dbt run --project-dir sample_project --profiles-dir sample_project --select test_simple
 
-# Spustit vsechny modely
+# Run all models
 dbt run --project-dir sample_project --profiles-dir sample_project
 ```
 
-## Struktura projektu
+## Project Structure
 
 ```
 dbt-keboola/
 ├── dbt/
 │   ├── adapters/keboola/
-│   │   ├── __init__.py          # Plugin registrace
+│   │   ├── __init__.py          # Plugin registration
 │   │   ├── connections.py       # KeboolaCredentials, KeboolaConnectionManager, KeboolaCursor
 │   │   ├── impl.py              # KeboolaAdapter
 │   │   ├── relation.py          # KeboolaRelation (Snowflake naming, case-insensitive)
 │   │   └── column.py            # KeboolaColumn (Snowflake types)
 │   └── include/keboola/
 │       ├── dbt_project.yml
-│       └── macros/              # SQL macros pro materializace
-├── sample_project/              # Testovaci dbt projekt
-├── test_query_service.py        # Test script pro Query Service SDK
+│       └── macros/              # SQL macros for materializations
+├── sample_project/              # Test dbt project
+├── test_query_service.py        # Test script for Query Service SDK
 ├── pyproject.toml
 └── requirements.txt
 ```
 
-## Instalace
+## Installation
 
 ```bash
-# Vytvorit venv s Python 3.13 (NE 3.14 - nekompatibilni s dbt)
+# Create venv with Python 3.13 (NOT 3.14 - incompatible with dbt)
 python3.13 -m venv .venv
 source .venv/bin/activate
 
-# Instalovat adapter
+# Install adapter
 pip install .
 
-# Pro vyvoj (editable install nefunguje dobre s namespace packages)
+# For development (editable install doesn't work well with namespace packages)
 pip install . --force-reinstall --no-deps
 ```
 
-## Konfigurace
+## Configuration
 
-### .env soubor
+### .env file
 ```
 KEBOOLA_API_TOKEN=your-storage-api-token
-KEBOOLA_WORKSPACE_ID=numeric-workspace-id       # Z API: GET /v2/storage/workspaces
+KEBOOLA_WORKSPACE_ID=numeric-workspace-id       # From API: GET /v2/storage/workspaces
 KEBOOLA_BRANCH_ID=numeric-branch-id
 KEBOOLA_SNOWFLAKE_DB=SAPI_xxxxx
 KEBOOLA_SNOWFLAKE_SCHEMA=WORKSPACE_xxxxx
 ```
 
-**DULEZITE:** `KEBOOLA_WORKSPACE_ID` musi byt ID z Storage API (`/v2/storage/workspaces`), ne cislo ze `SNOWFLAKE_USER`!
+**IMPORTANT:** `KEBOOLA_WORKSPACE_ID` must be the ID from Storage API (`/v2/storage/workspaces`), not the number from `SNOWFLAKE_USER`!
 
 ### profiles.yml
 ```yaml
@@ -83,8 +83,8 @@ keboola_project:
       threads: 4
 ```
 
-### dbt_project.yml (dispatch konfigurace)
-Pro spravne pouziti Keboola maker pridat:
+### dbt_project.yml (dispatch configuration)
+To properly use Keboola macros add:
 ```yaml
 dispatch:
   - macro_namespace: dbt
@@ -93,52 +93,52 @@ dispatch:
 
 ## Keboola Workspace vs Schema
 
-- **Workspace schema** (napr. `WORKSPACE_1282429287`) = **zapisovatelne** - sem dbt zapisuje tabulky
-- **Ostatni schema** (napr. `out.c-amplitude`) = **read-only** - zdrojova data
+- **Workspace schema** (e.g., `WORKSPACE_1282429287`) = **writable** - dbt writes tables here
+- **Other schemas** (e.g., `out.c-amplitude`) = **read-only** - source data
 
-Priklad SQL dotazu na zdrojova data:
+Example SQL query for source data:
 ```sql
 SELECT "platform", "event_type", count("event_id") as "events"
 FROM "SAPI_10504"."out.c-amplitude"."events"
 GROUP BY 1,2 ORDER BY 3 DESC;
 ```
 
-## Klicove implementacni detaily
+## Key Implementation Details
 
 ### Namespace packages
-Soubory `dbt/__init__.py` a `dbt/adapters/__init__.py` MUSI obsahovat:
+Files `dbt/__init__.py` and `dbt/adapters/__init__.py` MUST contain:
 ```python
 __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 ```
-Jinak se lokalni package prekryje s instalovanym dbt.
+Otherwise the local package will override the installed dbt.
 
 ### Case-insensitive matching
-Snowflake uklada identifikatory v UPPERCASE. `KeboolaRelation` implementuje:
-- `_is_exactish_match()` - case-insensitive porovnani relaci
-- `matches()` - case-insensitive vyhledavani
+Snowflake stores identifiers in UPPERCASE. `KeboolaRelation` implements:
+- `_is_exactish_match()` - case-insensitive relation comparison
+- `matches()` - case-insensitive search
 
 ### CREATE OR REPLACE
-Makro `keboola__get_create_table_as_sql` pouziva `CREATE OR REPLACE TABLE` pro idempotentni operace.
+Macro `keboola__get_create_table_as_sql` uses `CREATE OR REPLACE TABLE` for idempotent operations.
 
-### Transakce (simulovane)
-REST API nepodporuje transakce, metody `begin()`, `commit()`, `rollback()` jsou no-op.
+### Transactions (simulated)
+REST API doesn't support transactions, methods `begin()`, `commit()`, `rollback()` are no-op.
 
 ### KeboolaCredentials
-- Dedi z `dbt.adapters.contracts.connection.Credentials`
-- Base class ma `database` a `schema` jako required fields
-- Vsechny nase fields musi mit defaults (jinak dataclass error)
+- Inherits from `dbt.adapters.contracts.connection.Credentials`
+- Base class has `database` and `schema` as required fields
+- All our fields must have defaults (otherwise dataclass error)
 
 ### KeboolaCursor
-- Emuluje DB-API 2.0 cursor nad REST API
-- `execute()` vola `client.execute_query()` z keboola-query-service SDK
-- Vysledky uklada do pameti, `fetchall()` je vraci
+- Emulates DB-API 2.0 cursor over REST API
+- `execute()` calls `client.execute_query()` from keboola-query-service SDK
+- Results stored in memory, `fetchall()` returns them
 
 ## Keboola Query Service API
 
-### Potrebne credentials
-- **token**: Keboola Storage API token (zacina project_id-)
-- **workspace_id**: CISELNE ID workspace z `/v2/storage/workspaces` API
-- **branch_id**: CISELNE ID branch (ne "default")
+### Required credentials
+- **token**: Keboola Storage API token (starts with project_id-)
+- **workspace_id**: NUMERIC workspace ID from `/v2/storage/workspaces` API
+- **branch_id**: NUMERIC branch ID (not "default")
 
 ### SDK usage
 ```python
@@ -147,13 +147,13 @@ from keboola_query_service import Client
 client = Client(base_url="https://query.keboola.com", token=token)
 results = client.execute_query(
     branch_id="1261313",
-    workspace_id="2950196630",  # ID z Storage API!
+    workspace_id="2950196630",  # ID from Storage API!
     statements=["SELECT 1"],
     transactional=True,
 )
 ```
 
-### Jak zjistit spravne Workspace ID
+### How to find correct Workspace ID
 ```python
 import httpx
 headers = {'X-StorageApi-Token': token}
@@ -165,34 +165,34 @@ for ws in resp.json():
 ## Troubleshooting
 
 ### "No module named 'dbt.adapters.keboola'"
-- Pouzij non-editable install: `pip install .` (ne `pip install -e .`)
-- Over namespace package __init__.py soubory
+- Use non-editable install: `pip install .` (not `pip install -e .`)
+- Verify namespace package __init__.py files
 
 ### "Failed to parse branch ID"
-- branch_id musi byt ciselne, ne "default"
-- Najdes v Keboola UI: Settings > Branches
+- branch_id must be numeric, not "default"
+- Find it in Keboola UI: Settings > Branches
 
 ### "Failed to get workspace credentials (403)"
-- Over ze workspace_id je z `/v2/storage/workspaces` API
-- Over ze token ma pristup k workspace
-- Over ze workspace je na spravne branch
+- Verify workspace_id is from `/v2/storage/workspaces` API
+- Verify token has access to workspace
+- Verify workspace is on correct branch
 
 ### "approximate match" / case sensitivity error
-- Snowflake je case-insensitive, ale dbt hleda case-sensitive
-- `KeboolaRelation` musi implementovat `_is_exactish_match()` a `matches()`
+- Snowflake is case-insensitive, but dbt searches case-sensitive
+- `KeboolaRelation` must implement `_is_exactish_match()` and `matches()`
 
 ### Python 3.14 errors
-- dbt neni kompatibilni s Python 3.14
-- Pouzij Python 3.13 nebo 3.11
+- dbt is not compatible with Python 3.14
+- Use Python 3.13 or 3.11
 
 ## Status
 
-- [x] Zakladni adapter funguje
-- [x] `dbt debug` projde
-- [x] `dbt run` s table materializaci funguje
-- [x] Idempotentni operace (opakovane spusteni)
-- [x] Cteni z read-only schemat (out.c-amplitude)
-- [ ] View materializace
-- [ ] Incremental materializace
-- [ ] Snapshot materializace
-- [ ] Unit testy
+- [x] Basic adapter works
+- [x] `dbt debug` passes
+- [x] `dbt run` with table materialization works
+- [x] Idempotent operations (repeated runs)
+- [x] Reading from read-only schemas (out.c-amplitude)
+- [ ] View materialization
+- [ ] Incremental materialization
+- [ ] Snapshot materialization
+- [ ] Unit tests
