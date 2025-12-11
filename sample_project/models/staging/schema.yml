@@ -1,0 +1,49 @@
+version: 2
+
+sources:
+  - name: amplitude
+    description: Amplitude event tracking data
+    tables:
+      - name: events
+        description: Raw event data from Amplitude
+        identifier: out.c-amplitude.events
+        columns:
+          - name: event_id
+            description: Unique identifier for the event
+          - name: event_type
+            description: Type of event that occurred
+          - name: user_id
+            description: Identifier for the user who triggered the event
+          - name: event_time
+            description: Timestamp when the event occurred
+          - name: event_properties
+            description: JSON object containing additional event metadata
+
+models:
+  - name: stg_events
+    description: Staging model for Amplitude events with basic filtering
+    columns:
+      - name: event_id
+        description: Unique identifier for the event
+      - name: event_type
+        description: Type of event that occurred
+      - name: user_id
+        description: Identifier for the user who triggered the event
+      - name: event_time
+        description: Timestamp when the event occurred
+      - name: event_properties
+        description: JSON object containing additional event metadata
+
+  - name: stg_event_summary
+    description: Summary table of events aggregated by user and event type
+    columns:
+      - name: user_id
+        description: Identifier for the user
+      - name: event_type
+        description: Type of event
+      - name: event_count
+        description: Total number of events for this user and event type
+      - name: first_event_time
+        description: Timestamp of the first event
+      - name: last_event_time
+        description: Timestamp of the most recent event

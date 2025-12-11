@@ -1,0 +1,13 @@
+keboola_project:
+  target: dev
+  outputs:
+    dev:
+      type: keboola
+      database: "{{ env_var('KEBOOLA_SNOWFLAKE_DB') }}"
+      schema: "{{ env_var('KEBOOLA_SNOWFLAKE_SCHEMA') }}"
+      token: "{{ env_var('KEBOOLA_API_TOKEN') }}"
+      workspace_id: "{{ env_var('KEBOOLA_WORKSPACE_ID') }}"
+      branch_id: "{{ env_var('KEBOOLA_BRANCH_ID') }}"
+      host: "query.keboola.com"
+      timeout: 300
+      threads: 4

@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: events_incremental
+    description: Incremental model for Amplitude events using merge strategy
+    config:
+      materialized: incremental
+      unique_key: event_id
+      incremental_strategy: merge
+    columns:
+      - name: event_id
+        description: Unique identifier for the event
+        tests:
+          - unique
+          - not_null
+      - name: event_type
+        description: Type of event that occurred
+      - name: user_id
+        description: Identifier for the user who triggered the event
+      - name: event_time
+        description: Timestamp when the event occurred
+      - name: event_properties
+        description: JSON object containing additional event metadata
+      - name: loaded_at
+        description: Timestamp when the record was loaded into the warehouse
