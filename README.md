@@ -73,3 +73,5 @@ keboola_project:
 ## License
 
 MIT
+
+Made by 🪂 with ❤️ for 🐙
